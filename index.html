@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Raffle Countdown (Halloween)</title>
+  <style>
+    :root { --csun-red: #d22030; }
+    html, body {
+      height: 100%; margin: 0;
+      background: var(--csun-red); color: #fff;
+      font: bold 1.2em/1 Arial, Helvetica, sans-serif;
+      overflow: hidden; white-space: nowrap;
+    }
+    #bar { height: 100%; display: flex; align-items: center; justify-content: center; }
+    #countdown { text-shadow: 0 0 6px rgba(0,0,0,.4); }
+    .spook { animation: flash 0.25s steps(1,end) 12, shake 0.6s ease-in-out 3; }
+    @keyframes flash {
+      0%, 50%, 100% { background: #000; }
+      25%, 75% { background: #ff6a00; }
+    }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-6px); }
+      50% { transform: translateX(6px); }
+      75% { transform: translateX(-3px); }
+    }
+    .bat {
+      position: fixed; top: 50%; font-size: 24px;
+      pointer-events: none; opacity: 0;
+      transform: translateY(-50%) translateX(-10vw) rotate(0deg);
+    }
+    .bat.fly {
+      opacity: 1;
+      animation: wing 0.25s infinite ease-in-out, swoop 2.8s linear forwards;
+    }
+    @keyframes wing {
+      0%, 100% { transform: translateY(-50%) scaleY(1); }
+      50% { transform: translateY(calc(-50% - 3px)) scaleY(0.9); }
+    }
+    @keyframes swoop {
+      0% { left: -10vw; top: 40%; transform: translateY(-50%) rotate(0deg); }
+      50% { left: 45vw; top: 30%; transform: translateY(-50%) rotate(8deg); }
+      100% { left: 110vw; top: 55%; transform: translateY(-50%) rotate(-6deg); }
+    }
+    body:not(.spook) { background: var(--csun-red); }
+  </style>
+</head>
+<body>
+  <div id="bar"><div id="countdown">Next Raffle In: 10:00 Minutes</div></div>
+  <div class="bat" id="bat1">🦇</div>
+  <div class="bat" id="bat2" style="top: 35%; font-size: 28px;">🦇</div>
+  <div class="bat" id="bat3" style="top: 65%; font-size: 22px;">🦇</div>
+  <script>
+    // Ten-minute looping countdown, anchored to elapsed time to avoid drift.
+    const TOTAL_SECONDS = 10 * 60;
+    const el = document.getElementById('countdown');
+    let cycleStart = Date.now();
+    let previousCycle = 0;
+
+    function tick() {
+      const elapsed = Math.max(0, Math.floor((Date.now() - cycleStart) / 1000));
+      const cycle = Math.floor(elapsed / TOTAL_SECONDS);
+      const remaining = TOTAL_SECONDS - (elapsed % TOTAL_SECONDS);
+      const m = Math.floor(remaining / 60);
+      const s = remaining % 60;
+      el.textContent = `Next Raffle In: ${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')} Minutes`;
+      if (cycle > previousCycle) {
+        previousCycle = cycle;
+        celebrate();
+      }
+    }
+
+    tick();
+    setInterval(tick, 250);
+
+    function celebrate() {
+      document.body.classList.add('spook');
+      ['bat1','bat2','bat3'].forEach((id,i) => {
+        const b = document.getElementById(id);
+        b.classList.remove('fly');
+        b.style.top = (35 + Math.random()*40) + '%';
+        setTimeout(() => b.classList.add('fly'), i*120);
+        setTimeout(() => b.classList.remove('fly'), 3200 + i*100);
+      });
+      spookySound();
+      setTimeout(() => document.body.classList.remove('spook'), 3200);
+    }
+
+    let audioCtx;
+    function spookySound() {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const now = audioCtx.currentTime;
+        const noiseBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 1.5, audioCtx.sampleRate);
+        const data = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < data.length; i++) data[i] = (Math.random()*2-1) * (1 - i/data.length);
+        const noise = audioCtx.createBufferSource();
+        noise.buffer = noiseBuffer;
+        const noiseFilter = audioCtx.createBiquadFilter();
+        noiseFilter.type = 'lowpass';
+        noiseFilter.frequency.setValueAtTime(800, now);
+        noiseFilter.frequency.exponentialRampToValueAtTime(200, now + 1.5);
+        const noiseGain = audioCtx.createGain();
+        noiseGain.gain.setValueAtTime(0.001, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.3, now + 0.05);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+        noise.connect(noiseFilter).connect(noiseGain).connect(audioCtx.destination);
+        noise.start(now);
+        const osc = audioCtx.createOscillator();
+        osc.type = 'sawtooth';
+        const toneGain = audioCtx.createGain();
+        toneGain.gain.setValueAtTime(0.0008, now);
+        toneGain.gain.exponentialRampToValueAtTime(0.12, now + 0.05);
+        toneGain.gain.exponentialRampToValueAtTime(0.0008, now + 1.2);
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.exponentialRampToValueAtTime(220, now + 0.5);
+        osc.frequency.exponentialRampToValueAtTime(660, now + 1.2);
+        osc.connect(toneGain).connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 1.25);
+      } catch (e) {
+        // Audio may be blocked by the signage browser's autoplay policy.
+      }
+    }
+  </script>
+</body>
+</html>
